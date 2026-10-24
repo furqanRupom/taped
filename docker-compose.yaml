@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: taped_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-taped_db}
+      POSTGRES_USER: ${POSTGRES_USER:-taped_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - taped_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - taped_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: taped_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass "$${REDIS_PASSWORD}"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - taped_redis_data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - taped_network
+
+volumes:
+  taped_postgres_data:
+  taped_redis_data:
+
+networks:
+  taped_network:
+    driver: bridge
